@@ -1,41 +1,53 @@
-// useCurrentCity.js
-import { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 export const useUserLocation = () => {
-  const [city, setCity] = useState(null);
-  const [error, setError] = useState(null);
+  const [location, setLocation] = useState({ city: '', country: '' });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchCity = async (lat : number, lon:number) => {
+    const fetchLocation = async (latitude : number, longitude:number) => {
       try {
-        const response = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${'3df9290d63e449e592a97c89c6429924'}`);
-        const data = await response.json();
-        if (data.results.length > 0) {
-          setCity(data.results[0].components.city);
-        } else {
-          setError('City not found');
+        const {data}  = await axios.get('https://api.opencagedata.com/geocode/v1/json', {
+          params: {
+            q: `${latitude},${longitude}`,
+            key: '3df9290d63e449e592a97c89c6429924',
+          },
+        });
+
+        const { results } = data;
+        if (results && results.length > 0) {
+          const { components } = results[0];
+          setLocation({
+            city: components.city || components.town || components.village,
+            country: components.country,
+          });
         }
-      } catch (err:any) {
-        setError(err.message);
+      } catch (err) {
+        setError('Unable to retrieve location data');
       }
     };
 
-    const success = (position : any) => {
-      const { latitude, longitude } = position.coords;
-      fetchCity(latitude, longitude);
+    const getGeolocation = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            fetchLocation(latitude, longitude);
+          },
+          () => {
+            setError('Geolocation permission denied');
+          }
+        );
+      } else {
+        setError('Geolocation is not supported by this browser');
+      }
     };
 
-    const error = (err:any) => {
-      setError(err.message);
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(success, error);
-    } else {
-      setError('Geolocation is not supported by this browser');
-    }
+    getGeolocation();
   }, []);
 
-  return { city, error };
+  return { location, error };
 };
-;
+
